@@ -27,6 +27,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 ## Changelog
 _____________________________________________
 
+### 0.1.1
+
+* Improved
+    * Prevent pressing the Upload button multiple times
+
 ### 0.1.0
 
 * Released

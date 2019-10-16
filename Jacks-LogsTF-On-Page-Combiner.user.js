@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    http://tampermonkey.net/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -18,7 +18,7 @@
 (function () {
 	"use strict";
 
-	const version = "0.1.0";
+	const version = "0.1.1";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}">Jack's Log Combiner v${version} is installed</a></li>`);
@@ -499,18 +499,24 @@ margin: 10px;
 	// Function to update the progress bar and display a status message
 	function update_progress(progress, step_message) {
 
-		let percent = Math.round(progress * 100) + "%";
 
-		$(".progress_current_step").text(step_message);
-		$(".progress_number").text(percent);
-		$(".progress").css("width", percent);
+		// Allow the percentage to remain unchanged
+		if (progress > 0){
+			let percent = Math.round(progress * 100) + "%";
 
-		// If it was either successful or failed close the popup again and allow opening it again
-		if(progress == 1){
-			$(".upload_settings_container").addClass("hide");
-			$(".upload_close_container").removeClass("hide");
-			currently_uploading = false;
+			$(".progress_number").text(percent);
+			$(".progress").css("width", percent);
+
+			// If it was either successful or failed close the popup again and allow opening it again
+			if(progress == 1){
+				$(".upload_settings_container").addClass("hide");
+				$(".upload_close_container").removeClass("hide");
+				currently_uploading = false;
+			}
 		}
+	
+		$(".progress_current_step").text(step_message);
+
 	}
 
 	// On clicking the cancel upload cancel it
@@ -525,6 +531,12 @@ margin: 10px;
 		// Only allow the click event if the button is not disabled
 		if (!$(e.currentTarget).hasClass("disabled")) {
 			
+
+			// Prevent the button from being pressed again
+			$(".finalize_upload").addClass("disabled");
+
+			update_progress(-1, "Currently uploading the file...");
+
 			// Send the request with the data
 			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log", {
 				"body": log_file_data["upload"],
