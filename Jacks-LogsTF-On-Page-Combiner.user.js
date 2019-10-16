@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -18,7 +18,7 @@
 (function () {
 	"use strict";
 
-	const version = "0.1.1";
+	const version = "0.1.2";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}">Jack's Log Combiner v${version} is installed</a></li>`);
@@ -38,40 +38,46 @@
 	// Our custom CSS
 	const custom_css = `
 <style>
-.log_add_button {
-font-weight: 900;
-font-size: 120%;
-width: 25px;
-height: 24px;
-padding: 0px;
-position: absolute;
-transform: translate(-36px, -4px);
-line-height: 24px;
+.log_add_button, .log_add_button_on_log_page {
+	font-weight: 900;
+	font-size: 120%;
+	width: 25px;
+	height: 24px;
+	padding: 0px;
+	position: absolute;
+	transform: translate(-36px, -4px);
+	line-height: 24px;
 }
 
+
+.log_add_button_on_log_page {
+	transform: translate(-28px, 36px);
+}
+	
+
 .combiner_container {
-position: fixed;
-width: 400px;
-right: 0px;
-z-index: 1000;
-background-color: white;
-max-height: 90%;
-overflow-y: scroll;
-overflow-x: hidden;
-top: 50%;
-transform: translateY(-50%);
+	position: fixed;
+	width: 400px;
+	right: 0px;
+	z-index: 1000;
+	background-color: white;
+	max-height: 90%;
+	overflow-y: scroll;
+	overflow-x: hidden;
+	top: 50%;
+	transform: translateY(-50%);
 }
 
 .combine_text {
-padding: 20px;
-font-weight: 600;
+	padding: 20px;
+	font-weight: 600;
 }
 
 .button_container {
-display: flex;
-align-content: center;
-align-items: center;
-justify-content: center;
+	display: flex;
+	align-content: center;
+	align-items: center;
+	justify-content: center;
 }
 
 .button_container>.btn {
@@ -185,8 +191,9 @@ margin: 10px;
 	$("body").append(combiner_container);
 	$("body").append(upload_container);
 	$("[id^=log_]>td:first-child").prepend("<div class=\"btn btn-success log_add_button\">+</div>");
+	$(".log-header-left").prepend("<div class=\"btn btn-success log_add_button_on_log_page\">+</div>");
 
-	// When clicking a add log button toggle between the plus sign and the minus sign and add or remove it from the log list
+	// When clicking a add log button in the list toggle between the plus sign and the minus sign and add or remove it from the log list
 	$(".log_add_button").click((event) => {
 
 		let element = $(event.currentTarget);
@@ -194,25 +201,67 @@ margin: 10px;
 
 		// If log is not added yet, add it to the log list
 		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
-			logs_to_be_combined[current_id] = {
-				id: current_id,
-				name: element.next().text(),
-				map: element.parent().next().text()
-			};
-
+			// On the uploads page the text is in inputs, so we need special handling for them
+			// Text version
+			if(location.pathname.split("/").pop() != "uploads"){
+				logs_to_be_combined[current_id] = {
+					id: current_id,
+					name: element.next().text(),
+					map: element.parent().next().text()
+				};
+			// Input version
+			} else {
+				logs_to_be_combined[current_id] = {
+					id: current_id,
+					name: element.next().val(),
+					map: $(element.parent().next().children()[0]).val()
+				};
+			}
 		} else {
-
 			// If the log is already added remove it from the list and reset the style
 			delete logs_to_be_combined[current_id];
-			$(`#log_${current_id} .log_add_button`).text("+");
-			$(`#log_${current_id} .log_add_button`).removeClass("btn-danger");
-			$(`#log_${current_id} .log_add_button`).addClass("btn-success");
+			enable_button($(`#log_${current_id} .log_add_button`));
 		}
 
 		// Update the global log list (styling and the sidebar)
 		updateToBeCombinedLogList();
-
 	});
+
+	// Handling the button which is on a single log page
+	$(".log_add_button_on_log_page").click(() => {
+
+		let current_id = parseInt(location.pathname.split("/")[1]);
+
+		// If log is not added yet, add it to the log list
+		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
+			logs_to_be_combined[current_id] = {
+				id: current_id,
+				name: $("#log-name").text(),
+				map: $("#log-map").text()
+			};
+		} else {
+			// If the log is already added remove it from the list and reset the style
+			delete logs_to_be_combined[current_id];
+			enable_button($(".log_add_button_on_log_page"));
+		}
+
+		// Update the global log list (styling and the sidebar)
+		updateToBeCombinedLogList();
+	});
+
+	// Code to enable a button it is used multiple times so it is put into its own function
+	function enable_button(element){
+		element.text("+");
+		element.removeClass("btn-danger");
+		element.addClass("btn-success");
+	}
+
+	// Code to disable a button it is used multiple times so it is put into its own function
+	function disable_button(element){
+		element.text("-");
+		element.removeClass("btn-success");
+		element.addClass("btn-danger");
+	}
 
 	// Update the log list
 	function updateToBeCombinedLogList() {
@@ -234,9 +283,10 @@ margin: 10px;
 		// For every active log change the style to the remove button and add an entry into the sidebar list
 		for (let log in logs_to_be_combined) {
 			let logdata = logs_to_be_combined[log];
-			$(`#log_${log} .log_add_button`).text("-");
-			$(`#log_${log} .log_add_button`).removeClass("btn-success");
-			$(`#log_${log} .log_add_button`).addClass("btn-danger");
+			disable_button($(`#log_${log} .log_add_button`));
+			if("/"+log == location.pathname){
+				disable_button($(".log_add_button_on_log_page"));
+			}
 
 			$(".combiner_container .entries").append(`<tr id="${logdata.id}">
 <td class="title">${logdata.name}</td>
@@ -251,9 +301,10 @@ margin: 10px;
 	function clear_current_logs(){
 
 		for (let log in logs_to_be_combined) {
-			$(`#log_${log} .log_add_button`).text("+");
-			$(`#log_${log} .log_add_button`).removeClass("btn-danger");
-			$(`#log_${log} .log_add_button`).addClass("btn-success");
+			enable_button($(`#log_${log} .log_add_button`));
+			if("/"+log == location.pathname){
+				enable_button($(".log_add_button_on_log_page"));
+			}
 		}
 
 		logs_to_be_combined = {};

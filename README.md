@@ -27,6 +27,12 @@ Compared to (my and) other log combiners it should have some key advantages:
 ## Changelog
 _____________________________________________
 
+### 0.1.2
+
+* Improved
+    * You can now also add and remove logs directly on the log page (instead of only in the overview list)
+    * Logs on the uploads page are now correctly handled (for whatever reason you would combine logs from there)
+
 ### 0.1.1
 
 * Improved
