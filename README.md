@@ -32,6 +32,9 @@ _____________________________________________
 * Improved
     * If the user never generated a API key yet, the script will automatically generate on for him. (Also gets a key if it was previously wrong)
 
+Notice:
+    Additionally the namespace changed here, so you have to reinstall the script and remove the old version
+
 ### 0.1.3
 
 * Improved
