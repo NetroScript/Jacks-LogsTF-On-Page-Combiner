@@ -31,7 +31,7 @@
 	if ($("[alt='Sign in through Steam']").length > 0) {
 		is_logged_in = false;
 
-		if(api_key != ""){
+		if(api_key != "" && api_key != "None"){
 			console.log("User is not logged in, but we have an API key saved, so we will contineu");
 		} else {
 			console.log("User is not logged in, the user script will do nothing c:");
