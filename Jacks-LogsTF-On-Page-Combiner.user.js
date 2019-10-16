@@ -624,7 +624,7 @@ margin: 10px;
 			update_progress(-1, "Currently uploading the file...");
 
 			// If the user is not logged in but we have an api key upload files using the api key
-			let key_string = (!is_logged_in && api_key != "") ? "&key="+api_key : "";
+			let key_string = (!is_logged_in && api_key != "") ? "&key="+encodeURIComponent(api_key) : "";
 
 			// Send the request with the data
 			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log"+key_string, {
