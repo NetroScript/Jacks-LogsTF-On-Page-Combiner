@@ -42,7 +42,7 @@
 
 	// No API key is defined but the user is logged in, so we get the API key
 	if(api_key == ""){
-		fetch("http://logs.tf/uploader").then((response)=>{return response.text();}).then((text)=>{
+		fetch(location.protocol+"//logs.tf/uploader").then((response)=>{return response.text();}).then((text)=>{
 			api_key = text.split("id=\"apikey\">")[1].split("</span")[0];
 			GM_setValue("api_key", api_key);
 		});
