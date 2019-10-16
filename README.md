@@ -35,8 +35,6 @@ _____________________________________________
 ## Preview
 _____________________________________________
 
-Gif (and linked video) showing usage and installation of the userscript.
-[![Installation](https://i.imgur.com/av6yG9J.gif)](https://streamable.com/a1b8v)
-
 ![Preview](https://i.imgur.com/PvbewME.png)
 
+Also [here](https://streamable.com/a1b8v) a video of it in action.
