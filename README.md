@@ -27,6 +27,14 @@ Compared to (my and) other log combiners it should have some key advantages:
 ## Changelog
 _____________________________________________
 
+### 0.1.3
+
+* Improved
+    * If you are logged in at least once, the userscript will save your API key, if the script has an API key but no user is logged in, it will use the key instead for uploading. Like before if there is no user logged in or no API key most of the functionality will be hidden
+
+* Fixed
+    * A bug which made logs unreadable for the log parser (by adding an unwanted undefined)
+
 ### 0.1.2
 
 * Improved

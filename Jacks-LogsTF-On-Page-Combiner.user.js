@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    http://tampermonkey.net/
-// @version      0.1.2
+// @version      0.1.3
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -18,15 +18,39 @@
 (function () {
 	"use strict";
 
-	const version = "0.1.2";
+	const version = "0.1.3";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}">Jack's Log Combiner v${version} is installed</a></li>`);
 
+
+	let api_key = GM_getValue("api_key", "");
+
+	let is_logged_in = true;
+
 	if ($("[alt='Sign in through Steam']").length > 0) {
-		console.log("User is not logged in, the user script will do nothing c:");
-		return;
+		is_logged_in = false;
+
+		if(api_key != ""){
+			console.log("User is not logged in, but we have an API key saved, so we will contineu");
+		} else {
+			console.log("User is not logged in, the user script will do nothing c:");
+			return;
+		}
+
 	}
+
+	// No API key is defined but the user is logged in, so we get the API key
+	if(api_key == ""){
+		fetch("http://logs.tf/uploader").then((response)=>{return response.text();}).then((text)=>{
+			api_key = text.split("id=\"apikey\">")[1].split("</span")[0];
+			GM_setValue("api_key", api_key);
+		});
+	}
+
+	//If the uploader page is visited update the API-Key again
+	api_key = $("#apikey").text() || api_key;
+	GM_setValue("api_key", api_key);
 
 	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
 
@@ -346,7 +370,7 @@ margin: 10px;
 		let tournament = false;
 		let tournament_exists = true;
 
-		let out;
+		
 
 		// Check if the log even contains a round
 		if (log.match(/Tournament mode started/)) {
@@ -357,7 +381,7 @@ margin: 10px;
 		let lines = log.split("\n");
 
 		// Add the first log line
-		out += lines[0]+"\n";
+		let out = lines[0]+"\n";
 
 		lines.forEach((line) => {
 			
@@ -522,6 +546,9 @@ margin: 10px;
 		let timestamp = log_file_data["text"].split("\n").slice(-2, -1)[0].substr(0, 25);
 
 		// Add the information about the combined logs and the used software
+		if (log_file_data["text"].charAt(log_file_data["text"].length-1) != "\n"){
+			log_file_data["text"] += "\n";
+		}
 		log_file_data["text"] += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The following logs were combined: " + log_id_list.join(" & ") + "\"\n";
 		log_file_data["text"] += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The logs were combined using: "+github_url+"\"\n";
 
@@ -537,13 +564,12 @@ margin: 10px;
 		update_progress(current_step / total_combine_steps, "Waiting for user confirmation. - Total filesize: " + file_size(log_file_data["blob"].size));
 
 		// To the form add the file as upload
+		// Add the information about the combined logs and the used software
 		log_file_data["upload"].append("logfile", log_file_data["blob"], "combined.log");
 		log_file_data["uploader"] =  "Jacks On-Page Log Combiner v"+version;
 
 		// Now allow the user to upload the combined log
 		$(".finalize_upload").removeClass("disabled");
-
-
 	}
 
 
@@ -588,8 +614,11 @@ margin: 10px;
 
 			update_progress(-1, "Currently uploading the file...");
 
+			// If the user is not logged in but we have an api key upload files using the api key
+			let key_string = (!is_logged_in && api_key != "") ? "&key="+api_key : "";
+
 			// Send the request with the data
-			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log", {
+			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log"+key_string, {
 				"body": log_file_data["upload"],
 				"method": "POST",
 			}).then(response => {
