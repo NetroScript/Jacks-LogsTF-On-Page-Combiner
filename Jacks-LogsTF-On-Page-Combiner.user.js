@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
-// @namespace    http://tampermonkey.net/
-// @version      0.1.3
+// @namespace    https://github.com/NetroScript/
+// @version      0.1.4
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -18,7 +18,7 @@
 (function () {
 	"use strict";
 
-	const version = "0.1.3";
+	const version = "0.1.4";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}">Jack's Log Combiner v${version} is installed</a></li>`);
@@ -41,16 +41,25 @@
 	}
 
 	// No API key is defined but the user is logged in, so we get the API key
-	if(api_key == ""){
-		fetch(location.protocol+"//logs.tf/uploader").then((response)=>{return response.text();}).then((text)=>{
+	if(api_key == "" || api_key == "None"){
+		fetch(location.protocol+"//logs.tf/uploader").then((response)=>{return response.text();}).then(async (text)=>{
 			api_key = text.split("id=\"apikey\">")[1].split("</span")[0];
+			if (api_key == "None"){
+				let token = text.split("/createkey?t=")[1].split("',")[0];
+				// eslint-disable-next-line require-atomic-updates
+				api_key = await (await fetch(location.protocol+"//logs.tf/createkey?t="+token, {"referrer": location.protocol+"//logs.tf/uploader", "method": "GET", "mode": "cors"})).text();
+			}
 			GM_setValue("api_key", api_key);
 		});
 	}
 
 	//If the uploader page is visited update the API-Key again
-	api_key = $("#apikey").text() || api_key;
-	GM_setValue("api_key", api_key);
+	if (api_key != ""){
+		api_key = $("#apikey").text() || api_key;
+		GM_setValue("api_key", api_key);
+	}
+
+
 
 	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
 

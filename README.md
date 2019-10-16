@@ -27,6 +27,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 ## Changelog
 _____________________________________________
 
+### 0.1.4
+
+* Improved
+    * If the user never generated a API key yet, the script will automatically generate on for him. (Also gets a key if it was previously wrong)
+
 ### 0.1.3
 
 * Improved
