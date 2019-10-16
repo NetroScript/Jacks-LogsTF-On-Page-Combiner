@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Jacks Logs Combiner
+// @name         Jacks Log Combiner
 // @namespace    http://tampermonkey.net/
 // @version      0.1.0
 // @description  Allows you to combine logs on logs.tf directly on the page.
