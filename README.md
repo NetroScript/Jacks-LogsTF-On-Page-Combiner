@@ -1,7 +1,8 @@
 # Jacks logs.tf on-page combiner
 _____________________________________________
-This is a userscript (more or less a type of web extension) which allows you to combine logs on logs.tf without using any additional software. You just go to your profile page and select the logs you want to combine (when logged in) and then let the script do the rest for you.
+This is a userscript (more or less a type of web extension) which allows you to combine logs on logs.tf without using any additional software. You just go to any page with logs and select the logs you want to combine and then let the script do the rest for you. You need to be logged in at least once or set a custom working API key.
 
+The script should explain itself, but you additionally have a settings menu when you click the Jacks Log Combiner link on the right bottom of the page.
 
 ## Installation
 _____________________________________________
@@ -26,6 +27,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 
 ## Changelog
 _____________________________________________
+
+### 0.1.5
+
+* Improved
+    * You can now click the link in the footer to open a settings menu, there you can set a custom API key (which is not your own) and enable or disable further log minifying (which is disabled by default now) If you further minify the log you lose the accuracy stat
 
 ### 0.1.4
 

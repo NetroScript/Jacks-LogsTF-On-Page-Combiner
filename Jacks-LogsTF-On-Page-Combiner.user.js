@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.4
+// @version      0.1.5
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -18,13 +18,14 @@
 (function () {
 	"use strict";
 
-	const version = "0.1.4";
+	const version = "0.1.5";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
-	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}">Jack's Log Combiner v${version} is installed</a></li>`);
+	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}" class="log_combiner_open_settings">Jack's Log Combiner v${version} is installed</a></li>`);
 
 
 	let api_key = GM_getValue("api_key", "");
+	let advanced_compact_log = GM_getValue("advanced_compact_log", false);
 
 	let is_logged_in = true;
 
@@ -52,14 +53,6 @@
 			GM_setValue("api_key", api_key);
 		});
 	}
-
-	//If the uploader page is visited update the API-Key again
-	if (api_key != ""){
-		api_key = $("#apikey").text() || api_key;
-		GM_setValue("api_key", api_key);
-	}
-
-
 
 	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
 
@@ -117,7 +110,7 @@
 margin: 10px;
 }
 
-.combiner_upload_container {
+.combiner_upload_container, .combiner_global_settings_container {
 	position: fixed;
 	width: 400px;
 	right: 50%;
@@ -155,7 +148,7 @@ margin: 10px;
 	background-color: #e4e4e4;
 }
 
-.combiner_upload_container input {
+.combiner_upload_container input, .combiner_global_settings_container input {
 	width: 100%;
 	border: none;
 	padding: 15px 10px;
@@ -164,7 +157,7 @@ margin: 10px;
 	box-sizing: border-box;
 }
 
-.combiner_upload_container.hide {
+.combiner_upload_container.hide, .combiner_global_settings_container.hide {
 	display:none;
 	visibility: hidden;
 }
@@ -218,11 +211,29 @@ margin: 10px;
 	</div>
 </div>`;
 
+	const settings_container = `<div class="combiner_global_settings_container hide">
+	<h2>Log Combiner Settings</h2>
+	<div class="spacer"></div>
+    <a href="${github_url}">View the Github page</a>
+	<div class="spacer"></div>
+	<div class="_settings_container">
+		<h4>API Key</h4>
+		<input class="combiner_api_key" type="text" placeholder="Enter a custom API key">
+		<h4>Further minify the log</h4><h6>When enabled you lose the accuracy stat</h6>
+		<input class="combiner_minify" type="checkbox" name="log_map" placeholder="Enter a mapname" maxlength="24">
+		<div class="button_container">
+			<div class="btn btn-success save_combiner_settings">Save and close</div>
+			<div class="btn btn-danger cancel_settings">Cancel</div>
+		</div>
+	</div>
+	
+</div>`;
 
 	// Add our custom CSS and elements to the DOM
 	$("head").append(custom_css);
 	$("body").append(combiner_container);
 	$("body").append(upload_container);
+	$("body").append(settings_container);
 	$("[id^=log_]>td:first-child").prepend("<div class=\"btn btn-success log_add_button\">+</div>");
 	$(".log-header-left").prepend("<div class=\"btn btn-success log_add_button_on_log_page\">+</div>");
 
@@ -419,12 +430,18 @@ margin: 10px;
 			end_line = line_counter - 1;
 		}
 
-		let regex_1 = /triggered "shot_hit"/;
-		let regex_2 = /triggered "shot_fired"/;
+		let clear_regexes = [
+			/triggered "shot_hit"/,
+			/triggered "shot_fired"/
+		];
+
+		if(!advanced_compact_log){
+			clear_regexes = [];
+		}
 
 		// Now remove all lines which are not between start line and end line or which contain shot_hit or shot_fired events
 		lines = lines.filter((line, index) => {
-			return index >= start_line && index <= end_line && !(line.match(regex_1) || line.match(regex_2));
+			return index >= start_line && index <= end_line && !clear_regexes.some((regex) => {return line.match(regex);});
 		});
 
 		return out + lines.join("\n");
@@ -650,6 +667,35 @@ margin: 10px;
 		}
 	});
 
+	// When clicking the Log combiner link in the footer, open the settings menu and apply the current options
+	$(".log_combiner_open_settings").click(e => {
+		e.preventDefault();
+		e.stopPropagation();
+
+		let settings_menu = $(".combiner_global_settings_container");
+
+		if(settings_menu.hasClass("hide")){
+			$(".combiner_api_key").val(api_key);
+			$(".combiner_minify")[0].checked = advanced_compact_log;
+
+			settings_menu.removeClass("hide");
+		}
+
+	});
+
+	$(".cancel_settings").click(()=>{
+		$(".combiner_global_settings_container").addClass("hide");
+	});
+
+	$(".save_combiner_settings").click(()=>{
+		api_key = $(".combiner_api_key").val();
+		advanced_compact_log = $(".combiner_minify")[0].checked;
+
+		GM_setValue("api_key", api_key);
+		GM_getValue("advanced_compact_log", advanced_compact_log);
+
+		$(".combiner_global_settings_container").addClass("hide");
+	});
 
 	// Load the logs saved in the variable (so it works across sites)
 	updateToBeCombinedLogList();
