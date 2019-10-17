@@ -692,7 +692,7 @@ margin: 10px;
 		advanced_compact_log = $(".combiner_minify")[0].checked;
 
 		GM_setValue("api_key", api_key);
-		GM_getValue("advanced_compact_log", advanced_compact_log);
+		GM_setValue("advanced_compact_log", advanced_compact_log);
 
 		$(".combiner_global_settings_container").addClass("hide");
 	});
