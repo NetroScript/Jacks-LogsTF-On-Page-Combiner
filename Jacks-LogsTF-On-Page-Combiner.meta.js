@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.5
+// @version      0.1.6
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -11,6 +11,8 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_openInTab
 // @downloadURL  https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.user.js
 // @updateURL    https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.meta.js
+// @supportURL   https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/issues
 // ==/UserScript==

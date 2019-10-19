@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.5
+// @version      0.1.6
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -11,55 +11,18 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_openInTab
 // @downloadURL  https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.user.js
 // @updateURL    https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.meta.js
+// @supportURL   https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/issues
 // ==/UserScript==
 
 (function () {
 	"use strict";
 
-	const version = "0.1.5";
+	// Constants
+	const version = "0.1.6";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
-
-	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}" class="log_combiner_open_settings">Jack's Log Combiner v${version} is installed</a></li>`);
-
-
-	let api_key = GM_getValue("api_key", "");
-	let advanced_compact_log = GM_getValue("advanced_compact_log", false);
-
-	let is_logged_in = true;
-
-	if ($("[alt='Sign in through Steam']").length > 0) {
-		is_logged_in = false;
-
-		if(api_key != "" && api_key != "None"){
-			console.log("User is not logged in, but we have an API key saved, so we will contineu");
-		} else {
-			console.log("User is not logged in, the user script will do nothing c:");
-			return;
-		}
-
-	}
-
-	// No API key is defined but the user is logged in, so we get the API key
-	if(api_key == "" || api_key == "None"){
-		fetch(location.protocol+"//logs.tf/uploader").then((response)=>{return response.text();}).then(async (text)=>{
-			api_key = text.split("id=\"apikey\">")[1].split("</span")[0];
-			if (api_key == "None"){
-				let token = text.split("/createkey?t=")[1].split("',")[0];
-				// eslint-disable-next-line require-atomic-updates
-				api_key = await (await fetch(location.protocol+"//logs.tf/createkey?t="+token, {"referrer": location.protocol+"//logs.tf/uploader", "method": "GET", "mode": "cors"})).text();
-			}
-			GM_setValue("api_key", api_key);
-		});
-	}
-
-	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
-
-	let log_file_data = {};
-	let total_combine_steps = 0;
-	let cancel_upload = false;
-	let currently_uploading = false;
 
 	// Our custom CSS
 	const custom_css = `
@@ -79,7 +42,7 @@
 .log_add_button_on_log_page {
 	transform: translate(-28px, 36px);
 }
-	
+
 
 .combiner_container {
 	position: fixed;
@@ -219,15 +182,66 @@ margin: 10px;
 	<div class="_settings_container">
 		<h4>API Key</h4>
 		<input class="combiner_api_key" type="text" placeholder="Enter a custom API key">
-		<h4>Further minify the log</h4><h6>When enabled you lose the accuracy stat</h6>
+		<h4>Advanced log minifying</h4><h6>This (tries) to keep the accuracy stat intact while greatly reducing log size. Be aware you lose up to 1% accuracy with every log added due to potential rounding errors.</h6>
 		<input class="combiner_minify" type="checkbox" name="log_map" placeholder="Enter a mapname" maxlength="24">
 		<div class="button_container">
 			<div class="btn btn-success save_combiner_settings">Save and close</div>
 			<div class="btn btn-danger cancel_settings">Cancel</div>
 		</div>
 	</div>
-	
 </div>`;
+
+	//------------------------------------------------------------------------------------------------------------------
+
+	// Add the settings menu to the bottom
+	$(".container.footer .nav").append(`<li style="float:right"><a href="${github_url}" class="log_combiner_open_settings">Jack's Log Combiner v${version} is installed</a></li>`);
+
+
+	// Global variables / settings used
+	let api_key = GM_getValue("api_key", "");
+	let smart_compact_log = GM_getValue("smart_compact_log", true);
+	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
+	let log_file_data = {};
+	let total_combine_steps = 0;
+	let cancel_upload = false;
+	let currently_uploading = false;
+
+	let is_logged_in = true;
+
+
+	// Check if the user is currently logged in and act differently depending on that
+	if ($("[alt='Sign in through Steam']").length > 0) {
+		is_logged_in = false;
+
+		if (api_key != "" && api_key != "None") {
+			console.log("User is not logged in, but we have an API key saved, so we will contineu");
+		} else {
+			console.log("User is not logged in, the user script will do nothing c:");
+			return;
+		}
+
+	}
+
+	// No API key is defined but the user is logged in, so we get the API key
+	if (api_key == "" || api_key == "None") {
+		fetch(location.protocol + "//logs.tf/uploader").then((response) => {
+			return response.text();
+		}).then(async (text) => {
+			// Set the API key
+			api_key = text.split("id=\"apikey\">")[1].split("</span")[0];
+			// If it is none the user never used one before, so we let the page generate one for him
+			if (api_key == "None") {
+				let token = text.split("/createkey?t=")[1].split("',")[0];
+				// eslint-disable-next-line require-atomic-updates
+				api_key = await (await fetch(location.protocol + "//logs.tf/createkey?t=" + token, {
+					"referrer": location.protocol + "//logs.tf/uploader",
+					"method": "GET",
+					"mode": "cors"
+				})).text();
+			}
+			GM_setValue("api_key", api_key);
+		});
+	}
 
 	// Add our custom CSS and elements to the DOM
 	$("head").append(custom_css);
@@ -237,75 +251,8 @@ margin: 10px;
 	$("[id^=log_]>td:first-child").prepend("<div class=\"btn btn-success log_add_button\">+</div>");
 	$(".log-header-left").prepend("<div class=\"btn btn-success log_add_button_on_log_page\">+</div>");
 
-	// When clicking a add log button in the list toggle between the plus sign and the minus sign and add or remove it from the log list
-	$(".log_add_button").click((event) => {
 
-		let element = $(event.currentTarget);
-		let current_id = parseInt($(element.parents()[1]).attr("id").split("_")[1]);
-
-		// If log is not added yet, add it to the log list
-		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
-			// On the uploads page the text is in inputs, so we need special handling for them
-			// Text version
-			if(location.pathname.split("/").pop() != "uploads"){
-				logs_to_be_combined[current_id] = {
-					id: current_id,
-					name: element.next().text(),
-					map: element.parent().next().text()
-				};
-			// Input version
-			} else {
-				logs_to_be_combined[current_id] = {
-					id: current_id,
-					name: element.next().val(),
-					map: $(element.parent().next().children()[0]).val()
-				};
-			}
-		} else {
-			// If the log is already added remove it from the list and reset the style
-			delete logs_to_be_combined[current_id];
-			enable_button($(`#log_${current_id} .log_add_button`));
-		}
-
-		// Update the global log list (styling and the sidebar)
-		updateToBeCombinedLogList();
-	});
-
-	// Handling the button which is on a single log page
-	$(".log_add_button_on_log_page").click(() => {
-
-		let current_id = parseInt(location.pathname.split("/")[1]);
-
-		// If log is not added yet, add it to the log list
-		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
-			logs_to_be_combined[current_id] = {
-				id: current_id,
-				name: $("#log-name").text(),
-				map: $("#log-map").text()
-			};
-		} else {
-			// If the log is already added remove it from the list and reset the style
-			delete logs_to_be_combined[current_id];
-			enable_button($(".log_add_button_on_log_page"));
-		}
-
-		// Update the global log list (styling and the sidebar)
-		updateToBeCombinedLogList();
-	});
-
-	// Code to enable a button it is used multiple times so it is put into its own function
-	function enable_button(element){
-		element.text("+");
-		element.removeClass("btn-danger");
-		element.addClass("btn-success");
-	}
-
-	// Code to disable a button it is used multiple times so it is put into its own function
-	function disable_button(element){
-		element.text("-");
-		element.removeClass("btn-success");
-		element.addClass("btn-danger");
-	}
+	// | Used main functions | -----------------------------------------------------------------------------------------
 
 	// Update the log list
 	function updateToBeCombinedLogList() {
@@ -328,7 +275,7 @@ margin: 10px;
 		for (let log in logs_to_be_combined) {
 			let logdata = logs_to_be_combined[log];
 			disable_button($(`#log_${log} .log_add_button`));
-			if("/"+log == location.pathname){
+			if ("/" + log == location.pathname) {
 				disable_button($(".log_add_button_on_log_page"));
 			}
 
@@ -342,11 +289,11 @@ margin: 10px;
 	}
 
 	// Helper function to clear all the saved logs
-	function clear_current_logs(){
+	function clear_current_logs() {
 
 		for (let log in logs_to_be_combined) {
 			enable_button($(`#log_${log} .log_add_button`));
-			if("/"+log == location.pathname){
+			if ("/" + log == location.pathname) {
 				enable_button($(".log_add_button_on_log_page"));
 			}
 		}
@@ -355,23 +302,12 @@ margin: 10px;
 		updateToBeCombinedLogList();
 	}
 
-	// If the cancel button is clicked in the sidebar remove all logs and reset them to their default style
-	$("#cancel_combine").click(clear_current_logs);
-
-	// On clicking combine logs start the combine logs process
-	$("#combine_logs").click(combine_log_files);
-
-	// Allow closing the modal after being finished
-	$(".close_upload").click(() => {
-		$(".combiner_upload_container").addClass("hide");
-		$(".upload_settings_container").removeClass("hide");
-		$(".upload_close_container").addClass("hide");
-	});
-
 	// Get the log content from a log ID
 	async function get_log_text(log_id) {
 		let log = "";
-		let response = await fetch(location.protocol+"//logs.tf/logs/log_" + log_id + ".log.zip", { method: "GET" });
+		let response = await fetch(location.protocol + "//logs.tf/logs/log_" + log_id + ".log.zip", {
+			method: "GET"
+		});
 		let zip_file = await JSZip.loadAsync(response.blob());
 
 		for (let file in zip_file.files) {
@@ -390,8 +326,6 @@ margin: 10px;
 		let tournament = false;
 		let tournament_exists = true;
 
-		
-
 		// Check if the log even contains a round
 		if (log.match(/Tournament mode started/)) {
 			tournament_exists = true;
@@ -401,10 +335,10 @@ margin: 10px;
 		let lines = log.split("\n");
 
 		// Add the first log line
-		let out = lines[0]+"\n";
+		let out = lines[0] + "\n";
 
 		lines.forEach((line) => {
-			
+
 			// Get the interesting part for us (after the timestamp)
 			let parts = line.split(": ");
 
@@ -431,17 +365,93 @@ margin: 10px;
 		}
 
 		let clear_regexes = [
+			/position_report \(position /
+		];
+
+		let smart_advanced_clearing = [
 			/triggered "shot_hit"/,
 			/triggered "shot_fired"/
 		];
 
-		if(!advanced_compact_log){
-			clear_regexes = [];
+		// When smart log compacting is enabled we will keep the necessairy lines for accuracy stats but remove the others
+		if (smart_compact_log) {
+
+			// Object to store the data
+			let smart_accuracy_reducing = {};
+
+			//Now go through every necessary line
+			for (let i = end_line; i > start_line; i--) {
+
+				let line = lines[i];
+				let parts = line.split(": ");
+
+				if (parts.length > 1) {
+
+					let logged_information = parts[1];
+					// Check if the line matches with the events we want to minify
+					if (smart_advanced_clearing.some((regex) => {
+						return regex.test(logged_information);
+					})) {
+
+						// If our smart minifier doesn't keep track of it yet, add it as key
+						if (!Object.prototype.hasOwnProperty.call(smart_accuracy_reducing, logged_information)) {
+							smart_accuracy_reducing[logged_information] = {
+								"amount": 0,
+								"occurrences": []
+							};
+						}
+
+						// Now save how many there are in total and where to find them
+						smart_accuracy_reducing[logged_information].amount++;
+						smart_accuracy_reducing[logged_information].occurrences.push(i);
+					}
+				}
+			}
+
+			// Later we will remove all unneeded lines, we will store them here
+			let lines_to_be_removed = [];
+
+			// Now for every type of shot done 
+			for (let key in smart_accuracy_reducing) {
+
+				// Only if there were any shots fired we need to handle it (because otherwise it would be handled twice)
+				if (smart_advanced_clearing[1].test(key)) {
+
+					// Reference to the same type but now all hit shtos
+					let new_key = key.replace("shot_fired", "shot_hit");
+
+					// If there were any shots hit with the weapon
+					if (Object.prototype.hasOwnProperty.call(smart_accuracy_reducing, new_key)) {
+
+						// Get the least needed for each type so we have a precision of 1 percent but only the least elements needed
+						let data = reduce_smart_accuracy(smart_accuracy_reducing[new_key].amount, smart_accuracy_reducing[key].amount);
+
+						// Add all lines which can be removed containing shots fired
+						lines_to_be_removed = lines_to_be_removed.concat(smart_accuracy_reducing[key].occurrences.slice(data[1], smart_accuracy_reducing[key].occurrences.length));
+
+						// Add all lines which can be removed containing shots hit
+						lines_to_be_removed = lines_to_be_removed.concat(smart_accuracy_reducing[new_key].occurrences.slice(data[0], smart_accuracy_reducing[new_key].occurrences.length));
+
+					}
+					// If there were no hit shots with the weapon remove all fired events but one
+					else {
+						lines_to_be_removed = lines_to_be_removed.concat(smart_accuracy_reducing[key].occurrences.slice(1, smart_accuracy_reducing[key].occurrences.length));
+					}
+				}
+			}
+
+			// Now remove all the lines which we have added to the lines to be removed
+			lines = lines.filter((_, index) => {
+				return !lines_to_be_removed.includes(index);
+			});
+
 		}
 
-		// Now remove all lines which are not between start line and end line or which contain shot_hit or shot_fired events
+		// Now remove all lines which are not between start line and end line and which contain non needed events
 		lines = lines.filter((line, index) => {
-			return index >= start_line && index <= end_line && !clear_regexes.some((regex) => {return line.match(regex);});
+			return index >= start_line && index <= end_line && !clear_regexes.some((regex) => {
+				return regex.test(line);
+			});
 		});
 
 		return out + lines.join("\n");
@@ -471,12 +481,9 @@ margin: 10px;
 		// Step 1 is combining all the logs
 		// Step 2 is adding custom log text
 		// Step 3 is uploading the combined log
-		total_combine_steps = 4;
 		let current_step = 0;
 		let amount = Object.keys(logs_to_be_combined).length;
-
-		total_combine_steps += 2 * amount;
-
+		total_combine_steps += 4 + 2 * amount;
 
 		// Getting the map name
 		let map_set = new Set();
@@ -494,11 +501,13 @@ margin: 10px;
 		// Try to join the entire map name with " + "
 		if (map_set.join(" + ").length < 25) {
 			map_string = map_set.join(" + ");
+		}
 		// Try to join the entire map name with ","
-		} else if (map_set.join(",").length < 25) {
+		else if (map_set.join(",").length < 25) {
 			map_string = map_set.join(",");
+		}
 		// The map name won't fit, so try to shorten the map names
-		} else {
+		else {
 			let new_map_list = [];
 			// Try to extract the "important" part of all map names (f.e. process for cp_process_final)
 			map_set.forEach(map => {
@@ -515,7 +524,6 @@ margin: 10px;
 			} else if (new_map_list.join(",").length < 25) {
 				map_string = new_map_list.join(",");
 			}
-
 		}
 
 		// If a map name was found, set the form value to it, otherwise the user has to enter it himself
@@ -572,55 +580,173 @@ margin: 10px;
 		let timestamp = log_file_data["text"].split("\n").slice(-2, -1)[0].substr(0, 25);
 
 		// Add the information about the combined logs and the used software
-		if (log_file_data["text"].charAt(log_file_data["text"].length-1) != "\n"){
+		if (log_file_data["text"].charAt(log_file_data["text"].length - 1) != "\n") {
 			log_file_data["text"] += "\n";
 		}
 		log_file_data["text"] += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The following logs were combined: " + log_id_list.join(" & ") + "\"\n";
-		log_file_data["text"] += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The logs were combined using: "+github_url+"\"\n";
+		log_file_data["text"] += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The logs were combined using: " + github_url + "\"\n";
 
 		// Tell the user we now wait for his input
 		update_progress(current_step / total_combine_steps, "Waiting for user confirmation. - Total filesize: ");
 
 		// Create a data object from the log file
 		log_file_data["upload"] = new FormData();
-		log_file_data["blob"] = new Blob([log_file_data["text"]], { type: "text/plain" });
+		log_file_data["blob"] = new Blob([log_file_data["text"]], {
+			type: "text/plain"
+		});
 
 		// Update the progress bar
 		current_step++;
-		update_progress(current_step / total_combine_steps, "Waiting for user confirmation. - Total filesize: " + file_size(log_file_data["blob"].size));
+
+		// If the log size is over 10 MB already show a warning
+		if (log_file_data["blob"].size > 10485780) {
+			update_progress(current_step / total_combine_steps, "Waiting for user confirmation. - Total filesize: " + file_size(log_file_data["blob"].size) + " | THIS LOG WILL MOST LIKELY BE TOO BIG TO UPLOAD" + (smart_compact_log ? "" : " (try enabling the minify setting)"));
+		} else {
+			update_progress(current_step / total_combine_steps, "Waiting for user confirmation. - Total filesize: " + file_size(log_file_data["blob"].size));
+		}
 
 		// To the form add the file as upload
 		// Add the information about the combined logs and the used software
 		log_file_data["upload"].append("logfile", log_file_data["blob"], "combined.log");
-		log_file_data["uploader"] =  "Jacks On-Page Log Combiner v"+version;
+		log_file_data["uploader"] = "Jacks On-Page Log Combiner v" + version;
 
 		// Now allow the user to upload the combined log
 		$(".finalize_upload").removeClass("disabled");
+	}
+
+	// | Used Helper Functions | ---------------------------------------------------------------------------------------
+
+	// Code to enable a button it is used multiple times so it is put into its own function
+	function enable_button(element) {
+		element.text("+");
+		element.removeClass("btn-danger");
+		element.addClass("btn-success");
+	}
+
+	// Code to disable a button it is used multiple times so it is put into its own function
+	function disable_button(element) {
+		element.text("-");
+		element.removeClass("btn-success");
+		element.addClass("btn-danger");
 	}
 
 
 	// Function to update the progress bar and display a status message
 	function update_progress(progress, step_message) {
 
-
 		// Allow the percentage to remain unchanged
-		if (progress > 0){
+		if (progress > 0) {
 			let percent = Math.round(progress * 100) + "%";
 
 			$(".progress_number").text(percent);
 			$(".progress").css("width", percent);
 
 			// If it was either successful or failed close the popup again and allow opening it again
-			if(progress == 1){
+			if (progress == 1) {
 				$(".upload_settings_container").addClass("hide");
 				$(".upload_close_container").removeClass("hide");
 				currently_uploading = false;
 			}
 		}
-	
+
 		$(".progress_current_step").text(step_message);
 
 	}
+
+	// Convert a byte number into a better readable file size
+	function file_size(file_size) {
+		const i = Math.floor(Math.log(file_size) / Math.log(1024));
+		return (file_size / Math.pow(1024, i)).toFixed(2) + " " + "0kMGT".charAt(i) + "B";
+	}
+
+	// Based on https://stackoverflow.com/a/4652513
+	// Get the smallest possible number for the percentage
+	function reduce_smart_accuracy(bottom, top) {
+
+		// Don't allow precision higher than 1 percent
+		if (top > 100) {
+			bottom = Math.round(bottom / top * 100);
+			top = 100;
+		}
+
+		let reduce = (a, b) => {
+			return b ? reduce(b, a % b) : a;
+		};
+		let gcd = reduce(bottom, top);
+		return [bottom / gcd, top / gcd];
+	}
+
+	// | Event Handlers | ----------------------------------------------------------------------------------------------
+
+	// If the cancel button is clicked in the sidebar remove all logs and reset them to their default style
+	$("#cancel_combine").click(clear_current_logs);
+
+	// On clicking combine logs start the combine logs process
+	$("#combine_logs").click(combine_log_files);
+
+	// Allow closing the modal after being finished
+	$(".close_upload").click(() => {
+		$(".combiner_upload_container").addClass("hide");
+		$(".upload_settings_container").removeClass("hide");
+		$(".upload_close_container").addClass("hide");
+	});
+
+	// When clicking a add log button in the list toggle between the plus sign and the minus sign and add or remove it from the log list
+	$(".log_add_button").click((event) => {
+
+		let element = $(event.currentTarget);
+		let current_id = parseInt($(element.parents()[1]).attr("id").split("_")[1]);
+
+		// If log is not added yet, add it to the log list
+		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
+			// On the uploads page the text is in inputs, so we need special handling for them
+			// Text version
+			if (location.pathname.split("/").pop() != "uploads") {
+				logs_to_be_combined[current_id] = {
+					id: current_id,
+					name: element.next().text(),
+					map: element.parent().next().text()
+				};
+			}
+			// Input version
+			else {
+				logs_to_be_combined[current_id] = {
+					id: current_id,
+					name: element.next().val(),
+					map: $(element.parent().next().children()[0]).val()
+				};
+			}
+		} else {
+			// If the log is already added remove it from the list and reset the style
+			delete logs_to_be_combined[current_id];
+			enable_button($(`#log_${current_id} .log_add_button`));
+		}
+
+		// Update the global log list (styling and the sidebar)
+		updateToBeCombinedLogList();
+	});
+
+	// Handling the button which is on a single log page
+	$(".log_add_button_on_log_page").click(() => {
+
+		let current_id = parseInt(location.pathname.split("/")[1]);
+
+		// If log is not added yet, add it to the log list
+		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
+			logs_to_be_combined[current_id] = {
+				id: current_id,
+				name: $("#log-name").text(),
+				map: $("#log-map").text()
+			};
+		} else {
+			// If the log is already added remove it from the list and reset the style
+			delete logs_to_be_combined[current_id];
+			enable_button($(".log_add_button_on_log_page"));
+		}
+
+		// Update the global log list (styling and the sidebar)
+		updateToBeCombinedLogList();
+	});
 
 	// On clicking the cancel upload cancel it
 	$(".cancel_upload").click(() => {
@@ -633,7 +759,7 @@ margin: 10px;
 	$(".finalize_upload").click((e) => {
 		// Only allow the click event if the button is not disabled
 		if (!$(e.currentTarget).hasClass("disabled")) {
-			
+
 
 			// Prevent the button from being pressed again
 			$(".finalize_upload").addClass("disabled");
@@ -641,21 +767,29 @@ margin: 10px;
 			update_progress(-1, "Currently uploading the file...");
 
 			// If the user is not logged in but we have an api key upload files using the api key
-			let key_string = (!is_logged_in && api_key != "") ? "&key="+encodeURIComponent(api_key) : "";
+			let key_string = (!is_logged_in && api_key != "") ? "&key=" + encodeURIComponent(api_key) : "";
 
 			// Send the request with the data
-			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log"+key_string, {
+			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log" + key_string, {
 				"body": log_file_data["upload"],
 				"method": "POST",
 			}).then(response => {
-				return response.json();
+				if (response.ok) {
+					return response.json();
+				} else if (response.status == 413) {
+					throw ("Error 413 - Log was too big to upload. Do you have the minifying option enabled?");
+				} else {
+					throw ("Status Code Error " + response.status + " - " + response.statusText);
+				}
+
 			})
 				// The resulting JSON data
 				.then(data => {
-					if(data.success){
+					if (data.success) {
 						update_progress(1, "Successfully uploaded the log");
+						// Because it was successful clear the current logs
 						clear_current_logs();
-						window.open("https://logs.tf/" + data.log_id,"_blank");
+						GM_openInTab("https://logs.tf/" + data.log_id, { "active": true, "insert": true, "setParent": true });
 					} else {
 						update_progress(1, "Following error was displayed during log upload: " + data.error);
 					}
@@ -674,38 +808,33 @@ margin: 10px;
 
 		let settings_menu = $(".combiner_global_settings_container");
 
-		if(settings_menu.hasClass("hide")){
+		if (settings_menu.hasClass("hide")) {
 			$(".combiner_api_key").val(api_key);
-			$(".combiner_minify")[0].checked = advanced_compact_log;
+			$(".combiner_minify")[0].checked = smart_compact_log;
 
 			settings_menu.removeClass("hide");
 		}
 
 	});
 
-	$(".cancel_settings").click(()=>{
+	// When clicking cancel in the settings just hide the menu again
+	$(".cancel_settings").click(() => {
 		$(".combiner_global_settings_container").addClass("hide");
 	});
 
-	$(".save_combiner_settings").click(()=>{
+	// When clicking save in the settings get and apply the new settings and then hide the menu again
+	$(".save_combiner_settings").click(() => {
 		api_key = $(".combiner_api_key").val();
-		advanced_compact_log = $(".combiner_minify")[0].checked;
+		smart_compact_log = $(".combiner_minify")[0].checked;
 
 		GM_setValue("api_key", api_key);
-		GM_setValue("advanced_compact_log", advanced_compact_log);
+		GM_setValue("smart_compact_log", smart_compact_log);
 
 		$(".combiner_global_settings_container").addClass("hide");
 	});
+
 
 	// Load the logs saved in the variable (so it works across sites)
 	updateToBeCombinedLogList();
-
-
-	// Convert a byte number into a better readable file size
-	function file_size(file_size) {
-		const i = Math.floor(Math.log(file_size) / Math.log(1024));
-		return (file_size / Math.pow(1024, i)).toFixed(2) + " " + "0kMGT".charAt(i) + "B";
-	}
-
 
 })();
