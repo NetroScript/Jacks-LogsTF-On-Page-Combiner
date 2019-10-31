@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.6
+// @version      0.1.7
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -21,7 +21,7 @@
 	"use strict";
 
 	// Constants
-	const version = "0.1.6";
+	const version = "0.1.7";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	// Our custom CSS
@@ -508,16 +508,10 @@ margin: 10px;
 		}
 		// The map name won't fit, so try to shorten the map names
 		else {
-			let new_map_list = [];
+
 			// Try to extract the "important" part of all map names (f.e. process for cp_process_final)
-			map_set.forEach(map => {
-				let parts = map.split("_");
-				if (parts.length == 2) {
-					new_map_list.push(parts[1]);
-				} else {
-					new_map_list.push(parts.slice(-2, -1)[0]);
-				}
-			});
+			let new_map_list = map_set.map((map) => map.split("_")[1]);
+			
 			// Now try to join them like above
 			if (new_map_list.join(" + ").length < 25) {
 				map_string = new_map_list.join(" + ");

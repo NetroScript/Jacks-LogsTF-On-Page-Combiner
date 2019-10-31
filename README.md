@@ -27,6 +27,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 
 ## Changelog
 
+### 0.1.7
+
+* Improved
+  * Correctly get the map name now for a map like `cp_granary_pro_rc8`
+
 ### 0.1.6
 
 * Improved
