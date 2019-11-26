@@ -9,10 +9,9 @@ The script should explain itself, but you additionally have a settings menu when
 Use an extension which can execute userscripts (F.e. [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) for [Chrome](https://www.google.com/chrome/) or [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)  for [Firefox](https://www.mozilla.org/firefox))
 and then install using this link: [Jacks-LogsTF-On-Page-Combiner.user.js](https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.user.js).
 
-(Or paste / install it manually for your plugin)
+(Or paste / install it manually for your plugin, also works as just the JS file as long as you load the dependencies. So you can just append the dependencies and this to the head and it should work.)
 
 ## About
-
 
 I previously wrote another log combiner, which was based on python [here](https://github.com/NetroScript/Jacks-TF2LogCombiner), but some friends complained about the usability of it (not being used to f.e. the command line). And they told me the other web version log combiner (from Sharky) doesn't work / exist anymore.
 
@@ -26,6 +25,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 * You don't need to copy and paste log ids but can just click them
 
 ## Changelog
+
+### 0.1.8
+
+* Changed
+  * This script is now independent of functions of the userscript manager, for more info take a look at [issue #1](https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/issues/1) - but for the normal user nothing of interest changed.
 
 ### 0.1.7
 

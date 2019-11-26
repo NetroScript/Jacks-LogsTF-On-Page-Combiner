@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.7
+// @version      0.1.8
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -19,9 +19,8 @@
 
 (function () {
 	"use strict";
-
 	// Constants
-	const version = "0.1.7";
+	const version = "0.1.8";
 	const github_url = "https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/";
 
 	// Our custom CSS
@@ -190,6 +189,45 @@ margin: 10px;
 		</div>
 	</div>
 </div>`;
+
+
+	//--------------------------Polyfill used functions if they don't exist---------------------------------------------
+
+	// We are using the old var here to be able to define it in the global scope, because let would be local to the if 
+	// and without let the variable is not defined at all
+
+	// Use the LocalStorage API to replace get-, set- and delete- Value
+	if(typeof GM_getValue !== "function"){
+		// eslint-disable-next-line no-global-assign
+		var GM_getValue = (key_name, default_value) => {
+			let value = window.localStorage.getItem(key_name);
+
+			// If no value is saved yet, return the default value
+			if (value === null){
+				return default_value;
+			} 
+			return value;
+		};
+	}
+	if(typeof GM_setValue !== "function"){
+		// eslint-disable-next-line no-global-assign
+		var GM_setValue = (key_name, value) => {
+			window.localStorage.setItem(key_name, value);
+		};
+	}
+	if(typeof GM_deleteValue !== "function"){
+		// eslint-disable-next-line no-global-assign
+		var GM_deleteValue = (key_name) => {
+			window.localStorage.removeItem(key_name);
+		};
+	}
+	if(typeof GM_openInTab !== "function"){
+		// eslint-disable-next-line no-global-assign
+		var GM_openInTab = (url) => {
+			// Window.open doesn't permit any options of the Tampermonkey extension, so we just drop the options
+			window.open(url,"_blank");
+		};
+	}
 
 	//------------------------------------------------------------------------------------------------------------------
 
@@ -672,163 +710,186 @@ margin: 10px;
 
 	// | Event Handlers | ----------------------------------------------------------------------------------------------
 
-	// If the cancel button is clicked in the sidebar remove all logs and reset them to their default style
-	$("#cancel_combine").click(clear_current_logs);
-
-	// On clicking combine logs start the combine logs process
-	$("#combine_logs").click(combine_log_files);
-
-	// Allow closing the modal after being finished
-	$(".close_upload").click(() => {
-		$(".combiner_upload_container").addClass("hide");
-		$(".upload_settings_container").removeClass("hide");
-		$(".upload_close_container").addClass("hide");
-	});
-
-	// When clicking a add log button in the list toggle between the plus sign and the minus sign and add or remove it from the log list
-	$(".log_add_button").click((event) => {
-
-		let element = $(event.currentTarget);
-		let current_id = parseInt($(element.parents()[1]).attr("id").split("_")[1]);
-
-		// If log is not added yet, add it to the log list
-		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
-			// On the uploads page the text is in inputs, so we need special handling for them
-			// Text version
-			if (location.pathname.split("/").pop() != "uploads") {
-				logs_to_be_combined[current_id] = {
-					id: current_id,
-					name: element.next().text(),
-					map: element.parent().next().text()
-				};
-			}
-			// Input version
-			else {
-				logs_to_be_combined[current_id] = {
-					id: current_id,
-					name: element.next().val(),
-					map: $(element.parent().next().children()[0]).val()
-				};
-			}
-		} else {
-			// If the log is already added remove it from the list and reset the style
-			delete logs_to_be_combined[current_id];
-			enable_button($(`#log_${current_id} .log_add_button`));
-		}
-
-		// Update the global log list (styling and the sidebar)
-		updateToBeCombinedLogList();
-	});
-
-	// Handling the button which is on a single log page
-	$(".log_add_button_on_log_page").click(() => {
-
-		let current_id = parseInt(location.pathname.split("/")[1]);
-
-		// If log is not added yet, add it to the log list
-		if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
-			logs_to_be_combined[current_id] = {
-				id: current_id,
-				name: $("#log-name").text(),
-				map: $("#log-map").text()
-			};
-		} else {
-			// If the log is already added remove it from the list and reset the style
-			delete logs_to_be_combined[current_id];
-			enable_button($(".log_add_button_on_log_page"));
-		}
-
-		// Update the global log list (styling and the sidebar)
-		updateToBeCombinedLogList();
-	});
-
-	// On clicking the cancel upload cancel it
-	$(".cancel_upload").click(() => {
-		cancel_upload = true;
-		currently_uploading = false;
-		$(".combiner_upload_container").addClass("hide");
-	});
-
-	// When clicking the upload button finally upload the combined log
-	$(".finalize_upload").click((e) => {
-		// Only allow the click event if the button is not disabled
-		if (!$(e.currentTarget).hasClass("disabled")) {
+	// The userscript would run at document load, but if this script is used as a standalone we need to wait ourself to attach events
 
 
-			// Prevent the button from being pressed again
-			$(".finalize_upload").addClass("disabled");
+	function setup(){
 
-			update_progress(-1, "Currently uploading the file...");
+		// If the cancel button is clicked in the sidebar remove all logs and reset them to their default style
+		$("#cancel_combine").click(clear_current_logs);
 
-			// If the user is not logged in but we have an api key upload files using the api key
-			let key_string = (!is_logged_in && api_key != "") ? "&key=" + encodeURIComponent(api_key) : "";
+		// On clicking combine logs start the combine logs process
+		$("#combine_logs").click(combine_log_files);
 
-			// Send the request with the data
-			fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log" + key_string, {
-				"body": log_file_data["upload"],
-				"method": "POST",
-			}).then(response => {
-				if (response.ok) {
-					return response.json();
-				} else if (response.status == 413) {
-					throw ("Error 413 - Log was too big to upload. Do you have the minifying option enabled?");
-				} else {
-					throw ("Status Code Error " + response.status + " - " + response.statusText);
+		// Allow closing the modal after being finished
+		$(".close_upload").click(() => {
+			$(".combiner_upload_container").addClass("hide");
+			$(".upload_settings_container").removeClass("hide");
+			$(".upload_close_container").addClass("hide");
+		});
+
+		// When clicking a add log button in the list toggle between the plus sign and the minus sign and add or remove it from the log list
+		$(".log_add_button").click((event) => {
+
+			let element = $(event.currentTarget);
+			let current_id = parseInt($(element.parents()[1]).attr("id").split("_")[1]);
+
+			// If log is not added yet, add it to the log list
+			if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
+				// On the uploads page the text is in inputs, so we need special handling for them
+				// Text version
+				if (location.pathname.split("/").pop() != "uploads") {
+					logs_to_be_combined[current_id] = {
+						id: current_id,
+						name: element.next().text(),
+						map: element.parent().next().text()
+					};
 				}
+				// Input version
+				else {
+					logs_to_be_combined[current_id] = {
+						id: current_id,
+						name: element.next().val(),
+						map: $(element.parent().next().children()[0]).val()
+					};
+				}
+			} else {
+				// If the log is already added remove it from the list and reset the style
+				delete logs_to_be_combined[current_id];
+				enable_button($(`#log_${current_id} .log_add_button`));
+			}
 
-			})
-				// The resulting JSON data
-				.then(data => {
-					if (data.success) {
-						update_progress(1, "Successfully uploaded the log");
-						// Because it was successful clear the current logs
-						clear_current_logs();
-						GM_openInTab("https://logs.tf/" + data.log_id, { "active": true, "insert": true, "setParent": true });
+			// Update the global log list (styling and the sidebar)
+			updateToBeCombinedLogList();
+		});
+
+		// Handling the button which is on a single log page
+		$(".log_add_button_on_log_page").click(() => {
+
+			let current_id = parseInt(location.pathname.split("/")[1]);
+
+			// If log is not added yet, add it to the log list
+			if (!Object.prototype.hasOwnProperty.call(logs_to_be_combined, current_id)) {
+				logs_to_be_combined[current_id] = {
+					id: current_id,
+					name: $("#log-name").text(),
+					map: $("#log-map").text()
+				};
+			} else {
+				// If the log is already added remove it from the list and reset the style
+				delete logs_to_be_combined[current_id];
+				enable_button($(".log_add_button_on_log_page"));
+			}
+
+			// Update the global log list (styling and the sidebar)
+			updateToBeCombinedLogList();
+		});
+
+		// On clicking the cancel upload cancel it
+		$(".cancel_upload").click(() => {
+			cancel_upload = true;
+			currently_uploading = false;
+			$(".combiner_upload_container").addClass("hide");
+		});
+
+		// When clicking the upload button finally upload the combined log
+		$(".finalize_upload").click((e) => {
+			// Only allow the click event if the button is not disabled
+			if (!$(e.currentTarget).hasClass("disabled")) {
+
+
+				// Prevent the button from being pressed again
+				$(".finalize_upload").addClass("disabled");
+
+				update_progress(-1, "Currently uploading the file...");
+
+				// If the user is not logged in but we have an api key upload files using the api key
+				let key_string = (!is_logged_in && api_key != "") ? "&key=" + encodeURIComponent(api_key) : "";
+
+				// Send the request with the data
+				fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent($(".log_title").val()) + "&map=" + encodeURIComponent($(".log_map").val()) + "&uploader=" + encodeURIComponent(log_file_data["uploader"]) + "&logfile=combined.log" + key_string, {
+					"body": log_file_data["upload"],
+					"method": "POST",
+				}).then(response => {
+					if (response.ok) {
+						return response.json();
+					} else if (response.status == 413) {
+						throw ("Error 413 - Log was too big to upload. Do you have the minifying option enabled?");
 					} else {
-						update_progress(1, "Following error was displayed during log upload: " + data.error);
+						throw ("Status Code Error " + response.status + " - " + response.statusText);
 					}
+
 				})
-				// When an error happened during the request
-				.catch(err => {
-					update_progress(1, "An error happened on the request. -" + err);
-				});
-		}
-	});
+					// The resulting JSON data
+					.then(data => {
+						if (data.success) {
+							update_progress(1, "Successfully uploaded the log");
+							// Because it was successful clear the current logs
+							clear_current_logs();
+							GM_openInTab("https://logs.tf/" + data.log_id, { "active": true, "insert": true, "setParent": true });
+						} else {
+							update_progress(1, "Following error was displayed during log upload: " + data.error);
+						}
+					})
+					// When an error happened during the request
+					.catch(err => {
+						update_progress(1, "An error happened on the request. -" + err);
+					});
+			}
+		});
 
-	// When clicking the Log combiner link in the footer, open the settings menu and apply the current options
-	$(".log_combiner_open_settings").click(e => {
-		e.preventDefault();
-		e.stopPropagation();
+		// When clicking the Log combiner link in the footer, open the settings menu and apply the current options
+		$(".log_combiner_open_settings").click(e => {
+			e.preventDefault();
+			e.stopPropagation();
 
-		let settings_menu = $(".combiner_global_settings_container");
+			let settings_menu = $(".combiner_global_settings_container");
 
-		if (settings_menu.hasClass("hide")) {
-			$(".combiner_api_key").val(api_key);
-			$(".combiner_minify")[0].checked = smart_compact_log;
+			if (settings_menu.hasClass("hide")) {
+				$(".combiner_api_key").val(api_key);
+				$(".combiner_minify")[0].checked = smart_compact_log;
 
-			settings_menu.removeClass("hide");
-		}
+				settings_menu.removeClass("hide");
+			}
 
-	});
+		});
 
-	// When clicking cancel in the settings just hide the menu again
-	$(".cancel_settings").click(() => {
-		$(".combiner_global_settings_container").addClass("hide");
-	});
+		// When clicking cancel in the settings just hide the menu again
+		$(".cancel_settings").click(() => {
+			$(".combiner_global_settings_container").addClass("hide");
+		});
 
-	// When clicking save in the settings get and apply the new settings and then hide the menu again
-	$(".save_combiner_settings").click(() => {
-		api_key = $(".combiner_api_key").val();
-		smart_compact_log = $(".combiner_minify")[0].checked;
+		// When clicking save in the settings get and apply the new settings and then hide the menu again
+		$(".save_combiner_settings").click(() => {
+			api_key = $(".combiner_api_key").val();
+			smart_compact_log = $(".combiner_minify")[0].checked;
 
-		GM_setValue("api_key", api_key);
-		GM_setValue("smart_compact_log", smart_compact_log);
+			GM_setValue("api_key", api_key);
+			GM_setValue("smart_compact_log", smart_compact_log);
 
-		$(".combiner_global_settings_container").addClass("hide");
-	});
+			$(".combiner_global_settings_container").addClass("hide");
+		});
 
 
-	// Load the logs saved in the variable (so it works across sites)
-	updateToBeCombinedLogList();
+		// Load the logs saved in the variable (so it works across sites)
+		updateToBeCombinedLogList();
+	}
+
+	// Page is already ready
+	if(document.readyState == "complete" || document.readyState == "interactive"){
+		setup();
+	// We have to wait for the page to be ready
+	} else {
+		// Check every 50 ms if the site is loaded now
+		let wait_for_load_interval = setInterval(()=>{
+			if(document.readyState == "complete" || document.readyState == "interactive"){
+				console.log("Document loaded");
+				setup();
+				// Stop checking for the load
+				clearInterval(wait_for_load_interval);
+			} 
+		}, 50);
+	}
+
 
 })();
