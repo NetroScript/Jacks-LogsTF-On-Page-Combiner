@@ -198,8 +198,7 @@ margin: 10px;
 
 	// Use the LocalStorage API to replace get-, set- and delete- Value
 	if(typeof GM_getValue !== "function"){
-		// eslint-disable-next-line no-global-assign
-		var GM_getValue = (key_name, default_value) => {
+		window.GM_getValue = (key_name, default_value) => {
 			let value = window.localStorage.getItem(key_name);
 
 			// If no value is saved yet, return the default value
@@ -210,20 +209,17 @@ margin: 10px;
 		};
 	}
 	if(typeof GM_setValue !== "function"){
-		// eslint-disable-next-line no-global-assign
-		var GM_setValue = (key_name, value) => {
+		window.GM_setValue = (key_name, value) => {
 			window.localStorage.setItem(key_name, value);
 		};
 	}
 	if(typeof GM_deleteValue !== "function"){
-		// eslint-disable-next-line no-global-assign
-		var GM_deleteValue = (key_name) => {
+		window.GM_deleteValue = (key_name) => {
 			window.localStorage.removeItem(key_name);
 		};
 	}
 	if(typeof GM_openInTab !== "function"){
-		// eslint-disable-next-line no-global-assign
-		var GM_openInTab = (url) => {
+		window.GM_openInTab = (url) => {
 			// Window.open doesn't permit any options of the Tampermonkey extension, so we just drop the options
 			window.open(url,"_blank");
 		};
