@@ -26,6 +26,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 
 ## Changelog
 
+### 0.1.9
+
+* Added
+  * You can now upload games from zip files. This is notably to make a failed serveme.tf upload easier (instead of downloading the zip yourself, getting the correct logs and then uploading them). For that just input an URL like `https://serveme.tf/uploads/76561198092238060-993744-8672-20200302.zip`. The new option is in the settings menu (bottom of every page, the link called Jacks Log Combiner) and then `Upload Logs from a zip`. If you want to upload a failed log from serveme.tf you can find the links to the demo/zips [here](https://serveme.tf/reservations-played).
+
 ### 0.1.8
 
 * Changed

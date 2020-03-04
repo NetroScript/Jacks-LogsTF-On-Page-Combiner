@@ -1,17 +1,19 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.8
+// @version      0.1.9
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
 // @match        http://logs.tf/*
 // @match        https://logs.tf/*
+// @connect      serveme.tf
 // @run-at       document-end
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
 // @downloadURL  https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.user.js
 // @updateURL    https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/raw/master/Jacks-LogsTF-On-Page-Combiner.meta.js
 // @supportURL   https://github.com/NetroScript/Jacks-LogsTF-On-Page-Combiner/issues
@@ -36,13 +38,9 @@
 	transform: translate(-36px, -4px);
 	line-height: 24px;
 }
-
-
 .log_add_button_on_log_page {
 	transform: translate(-28px, 36px);
 }
-
-
 .combiner_container {
 	position: fixed;
 	width: 400px;
@@ -55,24 +53,20 @@
 	top: 50%;
 	transform: translateY(-50%);
 }
-
 .combine_text {
 	padding: 20px;
 	font-weight: 600;
 }
-
 .button_container {
 	display: flex;
 	align-content: center;
 	align-items: center;
 	justify-content: center;
 }
-
 .button_container>.btn {
 margin: 10px;
 }
-
-.combiner_upload_container, .combiner_global_settings_container {
+.combiner_upload_container, .combiner_upload_zip_container, .combiner_global_settings_container {
 	position: fixed;
 	width: 400px;
 	right: 50%;
@@ -84,33 +78,28 @@ margin: 10px;
 	top: 50%;
 	transform: translate(50%, -50%);
 }
-
 .progress {
 	height: 100%;
 	width: 80%;
 	background-color: #62dd62;
 	border-bottom: 2px solid #3eb652;
 }
-
 .progress-bar {
 	width: 100%;
 	height: 30px;
 	background-color: #f2f2f2;
 	border-bottom: 2px solid #cccccc;
 }
-
 .progress_number {
 	margin-top: -26px;
 	font-weight: 800;
 }
-
 .spacer {
 	margin: 10px 0px;
 	height: 2px;
 	background-color: #e4e4e4;
 }
-
-.combiner_upload_container input, .combiner_global_settings_container input {
+.combiner_upload_container input, .combiner_global_settings_container input, .combiner_upload_zip_container input {
 	width: 100%;
 	border: none;
 	padding: 15px 10px;
@@ -118,12 +107,54 @@ margin: 10px;
 	background-color: #eeeeee;
 	box-sizing: border-box;
 }
-
 .combiner_upload_container.hide, .combiner_global_settings_container.hide {
 	display:none;
 	visibility: hidden;
 }
 
+.checkbox_container {
+	display: flex;
+    vertical-align: middle;
+    justify-content: center;
+}
+
+input.combiner_minify, input.zip_combine {
+    width: initial;
+    margin-top: 13px;
+    margin-right: 10px;
+}
+
+.zip_upload_status {
+    margin-left: 5px;
+}
+
+.loadingdots:after {
+	content: ' .';
+	animation: loading 1s infinite;
+	transition: all 0.25s;
+}
+
+@keyframes loading {
+	0%, 10% {
+		opacity: 1.0;
+		color: transparent;
+		text-shadow: 4px 0 0 transparent, 8px 0 0 transparent;
+	}
+	30% {
+		color: black;
+		text-shadow: 4px 0 0 transparent, 8px 0 0 transparent;
+	}
+	50% {
+		text-shadow: 4px 0 0 black, 8px 0 0 transparent;
+	}
+	70%, 90% {
+		text-shadow: 4px 0 0 black, 8px 0 0 black;
+		opacity: 1.0;
+	}
+	100% {
+		opacity: 0.0;
+	}
+}
 </style>
 `;
 
@@ -139,7 +170,6 @@ margin: 10px;
 			</tr>
 		</thead>
 		<tbody class="entries">
-
 		</tbody>
 	</table>
 	<div class="button_container">
@@ -173,6 +203,26 @@ margin: 10px;
 	</div>
 </div>`;
 
+	const zip_upload_container = `<div class="combiner_upload_zip_container hide">
+	<h2>Upload logs from a zip File</h2>
+	<div class="spacer"></div>
+	<div class="upload_settings_container">
+		<h4>URL to zip</h4>
+		<input class="zip_file_url" type="text" placeholder="Enter the URL for a zip file (f.e. serveme zip)">
+		<div class="checkbox_container">
+			<input class="zip_combine" type="checkbox">
+			<h4>Check to do the upload combined, otherwise it will be done per map</h4>
+		</div>
+		<div class="checkbox_container">
+            <h4>Status: </h4><h4 class="zip_upload_status">Waiting for Fetch.</h4>
+		</div>
+		<div class="button_container">
+			<div class="btn btn-success zip_upload_interact">Fetch Logs</div>
+			<div class="btn btn-danger cancel_zip">Cancel</div>
+		</div>
+	</div>
+</div>`;
+
 	const settings_container = `<div class="combiner_global_settings_container hide">
 	<h2>Log Combiner Settings</h2>
 	<div class="spacer"></div>
@@ -181,8 +231,16 @@ margin: 10px;
 	<div class="_settings_container">
 		<h4>API Key</h4>
 		<input class="combiner_api_key" type="text" placeholder="Enter a custom API key">
-		<h4>Advanced log minifying</h4><h6>This (tries) to keep the accuracy stat intact while greatly reducing log size. Be aware you lose up to 1% accuracy with every log added due to potential rounding errors.</h6>
-		<input class="combiner_minify" type="checkbox" name="log_map" placeholder="Enter a mapname" maxlength="24">
+		<div class="checkbox_container">
+			<input class="combiner_minify" type="checkbox">
+			<h4>Advanced log minifying</h4>
+		</div>
+		<h6>This (tries) to keep the accuracy stat intact while greatly reducing log size. Be aware you lose up to 1% accuracy with every log added due to potential rounding errors.</h6>
+		<div class="spacer"></div>
+		<div class="button_container">
+			<div class="btn upload_zip">Upload Logs from a zip</div>
+		</div>
+		<div class="spacer"></div>
 		<div class="button_container">
 			<div class="btn btn-success save_combiner_settings">Save and close</div>
 			<div class="btn btn-danger cancel_settings">Cancel</div>
@@ -197,31 +255,31 @@ margin: 10px;
 	// and without let the variable is not defined at all
 
 	// Use the LocalStorage API to replace get-, set- and delete- Value
-	if(typeof GM_getValue !== "function"){
+	if (typeof GM_getValue !== "function") {
 		window.GM_getValue = (key_name, default_value) => {
 			let value = window.localStorage.getItem(key_name);
 
 			// If no value is saved yet, return the default value
-			if (value === null){
+			if (value === null) {
 				return default_value;
-			} 
+			}
 			return value;
 		};
 	}
-	if(typeof GM_setValue !== "function"){
+	if (typeof GM_setValue !== "function") {
 		window.GM_setValue = (key_name, value) => {
 			window.localStorage.setItem(key_name, value);
 		};
 	}
-	if(typeof GM_deleteValue !== "function"){
+	if (typeof GM_deleteValue !== "function") {
 		window.GM_deleteValue = (key_name) => {
 			window.localStorage.removeItem(key_name);
 		};
 	}
-	if(typeof GM_openInTab !== "function"){
+	if (typeof GM_openInTab !== "function") {
 		window.GM_openInTab = (url) => {
 			// Window.open doesn't permit any options of the Tampermonkey extension, so we just drop the options
-			window.open(url,"_blank");
+			window.open(url, "_blank");
 		};
 	}
 
@@ -236,6 +294,7 @@ margin: 10px;
 	let smart_compact_log = GM_getValue("smart_compact_log", true);
 	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
 	let log_file_data = {};
+	let custom_logs = {};
 	let total_combine_steps = 0;
 	let cancel_upload = false;
 	let currently_uploading = false;
@@ -282,6 +341,7 @@ margin: 10px;
 	$("body").append(combiner_container);
 	$("body").append(upload_container);
 	$("body").append(settings_container);
+	$("body").append(zip_upload_container);
 	$("[id^=log_]>td:first-child").prepend("<div class=\"btn btn-success log_add_button\">+</div>");
 	$(".log-header-left").prepend("<div class=\"btn btn-success log_add_button_on_log_page\">+</div>");
 
@@ -519,40 +579,15 @@ margin: 10px;
 		let amount = Object.keys(logs_to_be_combined).length;
 		total_combine_steps += 4 + 2 * amount;
 
-		// Getting the map name
-		let map_set = new Set();
-		let map_string = "";
+
+		let map_array = [];
 
 		// Get all the map names
 		for (let log in logs_to_be_combined) {
-			map_set.add(logs_to_be_combined[log]["map"]);
+			map_array.push(logs_to_be_combined[log]["map"]);
 		}
 
-		// Convert the Set to an array for easier working
-		map_set = Array.from(map_set);
-
-		// Function to try to find a map name
-		// Try to join the entire map name with " + "
-		if (map_set.join(" + ").length < 25) {
-			map_string = map_set.join(" + ");
-		}
-		// Try to join the entire map name with ","
-		else if (map_set.join(",").length < 25) {
-			map_string = map_set.join(",");
-		}
-		// The map name won't fit, so try to shorten the map names
-		else {
-
-			// Try to extract the "important" part of all map names (f.e. process for cp_process_final)
-			let new_map_list = map_set.map((map) => map.split("_")[1]);
-			
-			// Now try to join them like above
-			if (new_map_list.join(" + ").length < 25) {
-				map_string = new_map_list.join(" + ");
-			} else if (new_map_list.join(",").length < 25) {
-				map_string = new_map_list.join(",");
-			}
-		}
+		let map_string = map_array_to_map_name(map_array);
 
 		// If a map name was found, set the form value to it, otherwise the user has to enter it himself
 		$(".log_map").val(map_string);
@@ -704,12 +739,52 @@ margin: 10px;
 		return [bottom / gcd, top / gcd];
 	}
 
+	// Return a map name for an Array of maps
+	function map_array_to_map_name(array){
+		// Getting the map name
+		let map_set = new Set();
+		let map_string = "";
+
+		// Get all the map names
+		for (let map in array) {
+			map_set.add(array[map]);
+		}
+
+		// Convert the Set to an array for easier working
+		map_set = Array.from(map_set);
+
+		// Function to try to find a map name
+		// Try to join the entire map name with " + "
+		if (map_set.join(" + ").length < 25) {
+			map_string = map_set.join(" + ");
+		}
+		// Try to join the entire map name with ","
+		else if (map_set.join(",").length < 25) {
+			map_string = map_set.join(",");
+		}
+		// The map name won't fit, so try to shorten the map names
+		else {
+
+			// Try to extract the "important" part of all map names (f.e. process for cp_process_final)
+			let new_map_list = map_set.map((map) => map.split("_")[1]);
+
+			// Now try to join them like above
+			if (new_map_list.join(" + ").length < 25) {
+				map_string = new_map_list.join(" + ");
+			} else if (new_map_list.join(",").length < 25) {
+				map_string = new_map_list.join(",");
+			}
+		}
+
+		return map_string;
+	}
+
 	// | Event Handlers | ----------------------------------------------------------------------------------------------
 
 	// The userscript would run at document load, but if this script is used as a standalone we need to wait ourself to attach events
 
 
-	function setup(){
+	function setup() {
 
 		// If the cancel button is clicked in the sidebar remove all logs and reset them to their default style
 		$("#cancel_combine").click(clear_current_logs);
@@ -867,23 +942,254 @@ margin: 10px;
 		});
 
 
+		// When clicking the combine zip link in the settings menu, open the menu for that
+		$(".upload_zip").click(e => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			let settings_menu = $(".combiner_global_settings_container");
+			let zip_upload_menu = $(".combiner_upload_zip_container");
+
+			// Hide and show the correct stuff, reset to default values
+			settings_menu.addClass("hide");
+			zip_upload_menu.removeClass("hide");
+			$(".zip_file_url").val("");
+			$(".zip_combine")[0].checked = false;
+			$(".zip_upload_status").text("Waiting for Fetch.");
+		});
+
+		$(".zip_upload_interact").click(async (e) => {
+			// If we are not currently trying an upload
+			if (!$(e.currentTarget).hasClass("disabled")) {
+
+				// Get the URL and validate it
+				let url;
+				try {
+					url = new URL($(".zip_file_url").val());
+				} catch (error) {
+					$(".zip_upload_status").html("<div style='color:red;'>Invalid URL.</div>");
+					return;
+				}
+
+				// Disable the button
+				$(".zip_upload_interact").addClass("disabled");
+				$(".zip_upload_status").html("<div class='loadingdots'>Fetching Zip Archive</div>");
+
+				// Use Tampermonkey Request to bypass CORS
+				let response;
+				try {
+					response = (await new Promise((resolve, reject) => {
+						GM_xmlhttpRequest({
+							method: "GET",
+							url: url.toString(),
+							responseType: "blob",
+							onload: resolve,
+							onerror: reject,
+							onabort: reject,
+							ontimeout: reject
+						});
+					})).response;
+				} catch (error) {
+					$(".zip_upload_status").html("<div style='color:red;'>Web Request for the Zip Failed</div>");
+					$(".zip_upload_interact").removeClass("disabled");
+					return;
+				}
+
+				let files = {};
+				$(".zip_upload_status").html("<div class='loadingdots'>Loading Zip file</div>");
+				try {
+
+					// Load the zip and extract every .log file
+					let zip_file = await JSZip.loadAsync(response);
+
+					for (let file in zip_file.files) {
+						let name = zip_file.files[file].name;
+						if(name.endsWith(".log")){
+							$(".zip_upload_status").html("<div class='loadingdots'>Extracting " + name + "</div>");
+							files[name] = await zip_file.files[file].async("text");
+						}
+					}
+				} catch (error) {
+					$(".zip_upload_status").html("<div style='color:red;'>Failed Parsing Zip - is it a valid zip?</div>");
+					$(".zip_upload_interact").removeClass("disabled");
+					return;
+				}
+
+				if(Object.keys(files).length == 0){
+					$(".zip_upload_status").html("<div style='color:red;'>Zip didn't contain any logs.</div>");
+					$(".zip_upload_interact").removeClass("disabled");
+					return;
+				} 
+
+
+				$(".zip_upload_status").html("<div class='loadingdots'>Parsing Log Files</div>");
+
+				// Sort logs by file name, because the oldest log will then be first
+				let logs = Object.keys(files).sort();
+
+				let map_name_regex = /^L \d\d\/\d\d\/\d\d\d\d - \d\d:\d\d:\d\d: Loading map "([0-9a-zA-Z_\-.]+)"$/m;
+				let log_has_tournament = /Tournament mode started/;
+
+				let new_map = false;
+				let map_name = "";
+
+				let games = [];
+
+				for (let i in logs) {
+					let log = files[logs[i]];
+					$(".zip_upload_status").html("<div class='loadingdots'>Parsing Log Files - "+logs[i]+"</div>");
+					let size = (new TextEncoder().encode(log)).length;
+
+					// Have a minimum size to ignore unimportant logs
+					if (size > 5000) {
+
+						// A bit redundant to be honest
+						if(new_map){
+							// If the match has a started tournament round save it is a single log
+							if (log.match(log_has_tournament)){
+								games.push({
+									"map": map_name, 
+									"file_name": ((url.host == "serveme.tf") ? "serveme.tf #" + url.pathname.split("-")[1] : logs[i]) + " - #" +(games.length+1),
+									"log": process_log_file(log)
+								});
+							}
+						}
+
+						// Extract the new map name
+						let match = log.match(map_name_regex);
+						if(match != null){
+							new_map = true;
+							map_name = match[1];
+						}
+					}
+				}
+
+				// If the logs should be combined, reduce the games array into a single games object
+				if ($(".zip_combine")[0].checked){
+
+					let map_name = map_array_to_map_name(games.map(game => game.map));
+					let title = "";
+					if (url.host == "serveme.tf")
+						title = "serveme.tf #" + url.pathname.split("-")[1];
+					else title = games.reduce((total, cur) => { return total.file_name + " + " + cur.file_name; });
+
+					let logs = games.reduce((total, cur) => { return total.log + cur.log;});
+					games = [{
+						map: map_name,
+						file_name: title,
+						log: logs
+					}];
+				}
+
+				let any_errors = false;
+				let i = 1;
+
+				// For every game object upload a log
+				games.forEach(game => {
+
+					if(any_errors){
+						return;
+					}
+
+					$(".zip_upload_status").html("<div class='loadingdots'>Uploading Game #" + i + "</div>");
+
+					// Get a correct timestamp from the end of the log file
+					let timestamp = game.log.split("\n").slice(-2, -1)[0].substr(0, 25);
+
+					// Add the information about the combined logs and the used software
+					if (game.log.charAt(game.log.length - 1) != "\n") {
+						game.log += "\n";
+					}
+
+					if (url.host == "serveme.tf")
+						game.log += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The Serveme.tf Reservation was uploaded: #" + url.pathname.split("-")[1] + "\"\n";
+					game.log += timestamp + " \"Jack's Log Combiner<0><Console><Console>\" say \"The logs were uploaded from a zip using: " + github_url + "\"\n";
+
+
+					// Create a data object from the log file
+					let upload = new FormData();
+					let data_blob = new Blob([game.log], {
+						type: "text/plain"
+					});
+
+					// To the form add the file as upload
+					// Add the information about the combined logs and the used software
+					upload.append("logfile", data_blob, "combined.log");
+					let uploader = "Jacks On-Page Log Combiner v" + version;
+
+
+					// If the user is not logged in but we have an api key upload files using the api key
+					let key_string = (!is_logged_in && api_key != "") ? "&key=" + encodeURIComponent(api_key) : "";
+
+					// Send the request with the data
+					fetch(location.protocol + "//logs.tf/upload?title=" + encodeURIComponent(game.file_name) + "&map=" + encodeURIComponent(game.map) + "&uploader=" + encodeURIComponent(uploader) + "&logfile=combined.log" + key_string, {
+						"body": upload,
+						"method": "POST",
+					}).then(response => {
+						if (response.ok) {
+							return response.json();
+						} else if (response.status == 413) {
+							throw ("Error 413 - Log was too big to upload. Do you have the minifying option enabled?");
+						} else {
+							throw ("Status Code Error " + response.status + " - " + response.statusText);
+						}
+
+					})
+						// The resulting JSON data
+						.then(data => {
+							if (data.success) {
+								// Because it was successful clear the current logs
+								clear_current_logs();
+								GM_openInTab("https://logs.tf/" + data.log_id, { "active": true, "insert": true, "setParent": true });
+							} else {
+								$(".zip_upload_status").html("<div style='color:red;'>Following error was displayed during log upload: " + data.error +"</div>");
+								any_errors = true;
+								return;
+							}
+						})
+						// When an error happened during the request
+						.catch(err => {
+							$(".zip_upload_status").html("<div style='color:red;'>An error happened on the request. - " + err + "</div>");
+							any_errors = true;
+							return;
+						});
+					
+					i++;
+
+				});
+
+				// Upload is either successfull now or failed, so we can reenable the button
+				$(".zip_upload_interact").removeClass("disabled");
+
+				if (!any_errors) {
+					$(".zip_upload_status").text("Uploads successful");
+				}
+			}
+		});
+
+		// When clicking cancel in the zip upload just hide the menu again
+		$(".cancel_zip").click(() => {
+			$(".combiner_upload_zip_container").addClass("hide");
+		});
+
+
 		// Load the logs saved in the variable (so it works across sites)
 		updateToBeCombinedLogList();
 	}
 
 	// Page is already ready
-	if(document.readyState == "complete" || document.readyState == "interactive"){
+	if (document.readyState == "complete" || document.readyState == "interactive") {
 		setup();
-	// We have to wait for the page to be ready
+		// We have to wait for the page to be ready
 	} else {
 		// Check every 50 ms if the site is loaded now
-		let wait_for_load_interval = setInterval(()=>{
-			if(document.readyState == "complete" || document.readyState == "interactive"){
+		let wait_for_load_interval = setInterval(() => {
+			if (document.readyState == "complete" || document.readyState == "interactive") {
 				console.log("Document loaded");
 				setup();
 				// Stop checking for the load
 				clearInterval(wait_for_load_interval);
-			} 
+			}
 		}, 50);
 	}
 
