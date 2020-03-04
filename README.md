@@ -2,6 +2,8 @@
 
 This is a userscript (more or less a type of web extension) which allows you to combine logs on logs.tf without using any additional software. You just go to any page with logs and select the logs you want to combine and then let the script do the rest for you. You need to be logged in at least once or set a custom working API key.
 
+Additionally you can easily upload logs from your serveme.tf reservations (using the demo + log zip serveme.tf provides for some time).
+
 The script should explain itself, but you additionally have a settings menu when you click the Jacks Log Combiner link on the right bottom of the page.
 
 ## Installation

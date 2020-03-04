@@ -294,7 +294,6 @@ input.combiner_minify, input.zip_combine {
 	let smart_compact_log = GM_getValue("smart_compact_log", true);
 	let logs_to_be_combined = JSON.parse(GM_getValue("to_be_combined", "{}"));
 	let log_file_data = {};
-	let custom_logs = {};
 	let total_combine_steps = 0;
 	let cancel_upload = false;
 	let currently_uploading = false;
@@ -974,6 +973,13 @@ input.combiner_minify, input.zip_combine {
 				// Disable the button
 				$(".zip_upload_interact").addClass("disabled");
 				$(".zip_upload_status").html("<div class='loadingdots'>Fetching Zip Archive</div>");
+
+				// When not using a userscript, throw a warning because we can't do Cross Origin Requests without it
+				if (typeof GM_xmlhttpRequest !== "function") {
+					$(".zip_upload_status").html("<div style='color:red;'>Not running a Userscript with GM_xmlhttpRequest. But it is needed to do a Cross Origin Request. Meaning with your current way of installation, you can't use this feature.</div>");
+					$(".zip_upload_interact").removeClass("disabled");
+					return;
+				} 
 
 				// Use Tampermonkey Request to bypass CORS
 				let response;
