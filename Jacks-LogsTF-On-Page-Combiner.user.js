@@ -5,6 +5,7 @@
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js
 // @match        http://logs.tf/*
 // @match        https://logs.tf/*
 // @connect      serveme.tf
