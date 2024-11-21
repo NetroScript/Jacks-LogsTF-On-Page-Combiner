@@ -28,6 +28,11 @@ Compared to (my and) other log combiners it should have some key advantages:
 
 ## Changelog
 
+### 0.1.10
+
+* Fixed
+  * Using a blob for JSZip in some browsers (like Firefox 132.0.2 with Greasemonkey) causes an error, as it is streamed instead of already downloaded. For this reason now an ArrayBuffer is constructed from the blob and then used for JSZip. 
+
 ### 0.1.9
 
 * Added

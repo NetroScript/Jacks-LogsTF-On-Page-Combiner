@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jacks Log Combiner
 // @namespace    https://github.com/NetroScript/
-// @version      0.1.9
+// @version      0.1.10
 // @description  Allows you to combine logs on logs.tf directly on the page.
 // @author       NetroScript
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js
@@ -402,7 +402,14 @@ input.combiner_minify, input.zip_combine {
 		let response = await fetch(location.protocol + "//logs.tf/logs/log_" + log_id + ".log.zip", {
 			method: "GET"
 		});
-		let zip_file = await JSZip.loadAsync(response.blob());
+
+		// Convert the response to a Blob
+		let blob = await response.blob();
+
+		// Convert the Blob to an ArrayBuffer - Use array buffer instead of blob, as some browsers throw an error when trying to read a blob when it is streamed
+		let arrayBuffer = await blob.arrayBuffer();
+
+		let zip_file = await JSZip.loadAsync(arrayBuffer);
 
 		for (let file in zip_file.files) {
 			log += await zip_file.files[file].async("text");
